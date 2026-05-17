@@ -11,3 +11,9 @@ desktop.ini
 # Local-only
 private/
 *.local.md
+
+# TG raw archive (sensitive, локально)
+tg_archive/
+
+# Локальные секреты (токен, chat_id, sender_id) — НЕ коммитить
+bridge/config.local.py

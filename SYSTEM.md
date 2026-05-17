@@ -19,14 +19,10 @@
 ## 2. Каналы
 
 ### 2.1. Telegram-группа «Котики у Очага»
-- supergroup chat_id: `-1003765893459` (после миграции 17 мая под топики; старый id `-5276401003` мёртв)
-- Бот: `@lesika_pawmates_bot` (админ группы)
-- Топики (forum topics):
-  - `ZFOLD 7` — thread_id=6 (статья про Samsung)
-  - `Tech` — thread_id=8 (всё про код / баги / систему)
-  - `Postcards` — thread_id=10 (открыточный канал, длинные посты)
-  - `PawMates` — thread_id=12 (тамагочи-проект)
-  - `General` — thread_id=None (общий чат, всё без префикса)
+- supergroup (chat_id вынесен в локальный `bridge/config.local.py`, не в git)
+- Бот: `@lesika_pawmates_bot` (админ группы; token тоже в локальном конфиге)
+- Топики (forum topics): `ZFOLD 7`, `Tech`, `Postcards`, `PawMates`, `General` (общий)
+- `message_thread_id` для каждого топика — в `bridge/config.local.py` → `TOPIC_MAP`
 
 ### 2.2. feed.md
 - `D:\Projects\Postcard\team\feed.md` — единая лента, локальный markdown
@@ -126,16 +122,24 @@ python browser_bridge.py dump aeliss|sever             — выгрузить в
 
 ---
 
-## 6. Маппинг топиков
+## 6. Маппинг топиков и людей
 
-В `feed.py`:
+Сейчас живёт в `feed.py` как hardcoded (`TOPIC_MAP`, `SENDER_MAP`) и `tg.py` (`TOKEN`). В рефактор-TODO — вынести в локальный `bridge/config.local.py` (НЕ в git). Шаблон:
+
 ```python
+# bridge/config.local.py — не коммитить
+TG_TOKEN = "BOTFATHER_TOKEN"
+GROUP_CHAT_ID = -1003XXXXXXXXX   # supergroup id, узнать через первую отправку
 TOPIC_MAP = {
-    "ZFOLD": 6, "TECH": 8, "POSTCARDS": 10, "SPA": 10, "PAWMATES": 12,
+    "ZFOLD": 0,      # thread_id топика про Samsung
+    "TECH": 0,       # код / баги
+    "POSTCARDS": 0,  # открытки
+    "SPA": 0,        # синоним POSTCARDS
+    "PAWMATES": 0,   # тамагочи
 }
 SENDER_MAP = {
-    "135873954": "АЛЁНА",   # Lesika
-    "280477225": "ЮДЖИН",   # Eugene Lyssovsky
+    "135873954": "АЛЁНА",  # telegram user id → имя в ленте
+    "280477225": "ЮДЖИН",
 }
 ```
 
@@ -150,7 +154,7 @@ SENDER_MAP = {
 - `pip install playwright` + `playwright install chromium`
 - `pip install` — стандартная библиотека для остального
 - Git с настроенным push в `github.com/Lesica/postcard-team`
-- Telegram-бот: токен в `tg.py:TOKEN` (сейчас `8161341622:AAF5XBM-...`)
+- Telegram-бот: токен из BotFather, положить в `bridge/config.local.py` (см. `.example`)
 
 ### 7.2. Создать группу и топики в Telegram
 1. Создать Telegram-группу
@@ -159,7 +163,7 @@ SENDER_MAP = {
 4. Создать топики (Tech, Postcards, ZFOLD, PawMates)
 5. Группа автоматически промигрирует в **supergroup** — узнать новый `chat_id` через первую отправку (ошибка 400 покажет `migrate_to_chat_id`)
 6. Узнать `message_thread_id` каждого топика: написать туда сообщение → посмотреть `tg_archive/YYYY-MM-DD.jsonl` → найти `message_thread_id`
-7. Обновить `TOPIC_MAP` в `feed.py` и `GROUP_CHAT_ID`
+7. Заполнить `bridge/config.local.py`: `TG_TOKEN`, `GROUP_CHAT_ID`, `TOPIC_MAP`, `SENDER_MAP`
 8. Обновить `state.json`: `group_chat_id`
 
 ### 7.3. Запустить Chrome для bridge
@@ -203,6 +207,33 @@ python feed.py loop
 - Hourly snapshot уходит в git под именем `history/YYYY-MM-DD_HHMM_tg_snapshot.md`. Содержит три секции: TG за час + DOM Аэлис + DOM Север с пометкой `✓ в feed` / `✗ НЕ В FEED`.
 
 ---
+
+## 8a. Когда НЕ трогать Loop
+
+После сегодняшнего дня правило (от Севера):
+- Фикс **read-only** + закрывает реальный баг + до 30 минут → делать сейчас.
+- Фикс трогает Loop / send / state.offset / может уронить доставку → сначала `python feed.py snapshot 1 --no-push` (страховка), потом правка, потом перезапуск Loop.
+- Каждый рестарт Loop рискует потерять одно сообщение в момент TaskStop. Не перезапускать Loop в момент активного обсуждения.
+
+## 8b. Чеклист «голова пропала»
+
+Если кажется что Аэлис или Север молчат:
+1. Есть ли сообщение в TG? (`tg_archive/*.jsonl` или скрин Алёны)
+2. Попало ли в feed.md? (`feed.py tail 5` или grep)
+3. Попало ли в input головы? (`python browser_bridge.py read aeliss 1` или прямой dump)
+4. Нажался ли Send? (input пуст или там застрял текст?)
+5. Есть ли ответ в DOM? (assistant блоки)
+6. Попал ли ответ в feed/TG? (или потерян, ловить руками)
+7. Не ушёл ли ответ через `[FALLBACK]`? (см. секцию 9)
+
+Если на 3 или 4 шаге всё мёртво — модал в Chrome у головы блокирует UI, нужен Escape через playwright.
+
+## 8c. Вложения
+
+- **Большие тексты / файлы** не вставлять в input bridge (claude.ai/chatgpt.com обрежет или съест).
+- Класть в `team/attachments/`, пушить в git, в feed/input давать только raw URL.
+- Головы читают через WebFetch.
+- Лимит: <5-7K символов можно в input, больше — только URL (см. task #12).
 
 ## 9. Команды самой первой помощи
 
