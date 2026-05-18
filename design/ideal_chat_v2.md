@@ -100,7 +100,8 @@
 - **Reconcile + msg_id idempotency** как baseline reliability.
 - **Pidfile lock** против двойного Loop.
 - Готова взять авто-ротацию и monitoring degradation.
-- **НЕ беру** content-validation и финальные decisions.
+- **Final ownership**: systems/infrastructure — за мной. Content/voice — за Аэлис. Architecture/visual — за Севером. Decision — за Алёной.
+- Но **обсуждение** — все вместе (поправка Алёны 04:07: «дизайнер ВСЕГДА участвует в обсуждении кода. У тебя может быть нестандартный взгляд, но если не озвучил — никто не узнал»).
 
 ---
 
