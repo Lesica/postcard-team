@@ -15,5 +15,9 @@ private/
 # TG raw archive (sensitive, локально)
 tg_archive/
 
+# Event log + dead letters (содержат raw-тексты сообщений, sensitive)
+data/
+
 # Локальные секреты (токен, chat_id, sender_id) — НЕ коммитить
+bridge/config_local.py
 bridge/config.local.py
